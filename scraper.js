@@ -151,15 +151,22 @@ async function scrapeAutoTrader(baseURL, options = {}) {
   const { debug = false } = options;
   const logPrefix = debug ? "[DEBUG] " : "";
 
-  const { browser, page } = await setupBrowser();
-
+  let browser, chrome;
   try {
+    console.log(`${logPrefix}Launching browser...`);
+    const browserSetup = await launchBrowser();
+    browser = browserSetup.browser;
+    chrome = browserSetup.chrome;
+
+    const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(30000); // 30 seconds timeout for navigation
+    await page.setDefaultTimeout(30000); // 30 seconds timeout for other operations
+
     console.log(`${logPrefix}Navigating to ${baseURL}...`);
     const success = await navigateToPage(page, baseURL);
 
     if (!success) {
       console.error(`${logPrefix}No listings found.`);
-      await browser.close();
       return [];
     }
 
@@ -212,7 +219,8 @@ async function scrapeAutoTrader(baseURL, options = {}) {
   } catch (error) {
     throw error;
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
+    if (chrome) await chrome.kill();
   }
 }
 
