@@ -8,7 +8,16 @@ app.use(express.json());
 
 // Browser setup helper
 async function setupBrowser() {
-  const browser = await puppeteer.launch({
+  const isRender = process.env.RENDER === "true";
+  console.log("Environment:", {
+    isRender,
+    RENDER: process.env.RENDER,
+    CHROME_PATH: process.env.CHROME_PATH,
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD:
+      process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD,
+  });
+
+  const launchOptions = {
     headless: "new",
     args: [
       "--no-sandbox",
@@ -18,21 +27,60 @@ async function setupBrowser() {
       "--disable-gpu",
       "--window-size=1920x1080",
     ],
-  });
+  };
 
-  const page = await browser.newPage();
+  // Add Render-specific configuration
+  if (isRender) {
+    console.log("Running on Render, configuring Chrome path");
+    const chromePath = process.env.CHROME_PATH || "/usr/bin/google-chrome";
+    launchOptions.executablePath = chromePath;
 
-  await page.setUserAgent(
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    // Check if Chrome exists
+    const { execSync } = require("child_process");
+    try {
+      console.log("Checking Chrome installation...");
+      const chromeVersion = execSync(`${chromePath} --version`).toString();
+      console.log("Chrome version:", chromeVersion);
+    } catch (error) {
+      console.error("Error checking Chrome:", error.message);
+      console.log("Listing available Chrome installations:");
+      try {
+        const locations = execSync("ls -l /usr/bin/google-chrome*").toString();
+        console.log(locations);
+      } catch (err) {
+        console.error("Error listing Chrome locations:", err.message);
+      }
+    }
+  }
+
+  console.log(
+    "Browser launch options:",
+    JSON.stringify(launchOptions, null, 2)
   );
 
-  await page.setExtraHTTPHeaders({
-    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-    Accept:
-      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-  });
+  try {
+    const browser = await puppeteer.launch(launchOptions);
+    const page = await browser.newPage();
 
-  return { browser, page };
+    await page.setUserAgent(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    );
+
+    await page.setExtraHTTPHeaders({
+      "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    });
+
+    return { browser, page };
+  } catch (error) {
+    console.error("Error launching browser:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
 }
 
 // Page navigation helper
