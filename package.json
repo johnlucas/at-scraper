@@ -1,16 +1,20 @@
 {
   "name": "autotrader",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "scraper.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node scraper.js",
+    "dev": "node scraper.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "AutoTrader scraper for Toyota RAV4",
   "dependencies": {
     "csv-writer": "^1.6.0",
     "puppeteer": "^23.11.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
