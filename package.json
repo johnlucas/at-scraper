@@ -1,22 +1,28 @@
 {
-  "name": "autotrader",
+  "name": "autotrader-api-scraper",
   "version": "1.0.0",
   "main": "scraper.js",
   "scripts": {
     "start": "node scraper.js",
     "dev": "nodemon scraper.js"
   },
-  "keywords": [],
+  "keywords": [
+    "scraper",
+    "autotrader",
+    "api",
+    "puppeteer"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "AutoTrader scraper API service",
+  "description": "AutoTrader scraper REST API service",
   "dependencies": {
     "csv-writer": "^1.6.0",
     "express": "^4.18.2",
-    "puppeteer": "^23.11.1"
+    "puppeteer-core": "^23.11.1",
+    "chrome-launcher": "^1.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=18.0.0"
