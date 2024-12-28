@@ -1,31 +1,38 @@
-const express = require("express");
-const puppeteer = require("puppeteer-core");
-const chromeLauncher = require("chrome-launcher");
+const puppeteer = require("puppeteer");
 const createCsvWriter = require("csv-writer").createObjectCsvWriter;
-
+const express = require("express");
 const app = express();
+const port = process.env.PORT || 3000;
+
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
-
-async function launchBrowser() {
-  // Launch Chrome using chrome-launcher
-  const chrome = await chromeLauncher.launch({
-    chromeFlags: [
-      "--headless",
-      "--disable-gpu",
+// Browser setup helper
+async function setupBrowser() {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: [
       "--no-sandbox",
+      "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--disable-gpu",
+      "--window-size=1920x1080",
     ],
   });
 
-  // Connect puppeteer to the launched Chrome instance
-  const browser = await puppeteer.connect({
-    browserURL: `http://localhost:${chrome.port}`,
-    defaultViewport: { width: 1920, height: 1080 },
+  const page = await browser.newPage();
+
+  await page.setUserAgent(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  );
+
+  await page.setExtraHTTPHeaders({
+    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
   });
 
-  return { browser, chrome };
+  return { browser, page };
 }
 
 // Page navigation helper
@@ -151,22 +158,15 @@ async function scrapeAutoTrader(baseURL, options = {}) {
   const { debug = false } = options;
   const logPrefix = debug ? "[DEBUG] " : "";
 
-  let browser, chrome;
+  const { browser, page } = await setupBrowser();
+
   try {
-    console.log(`${logPrefix}Launching browser...`);
-    const browserSetup = await launchBrowser();
-    browser = browserSetup.browser;
-    chrome = browserSetup.chrome;
-
-    const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(30000); // 30 seconds timeout for navigation
-    await page.setDefaultTimeout(30000); // 30 seconds timeout for other operations
-
     console.log(`${logPrefix}Navigating to ${baseURL}...`);
     const success = await navigateToPage(page, baseURL);
 
     if (!success) {
       console.error(`${logPrefix}No listings found.`);
+      await browser.close();
       return [];
     }
 
@@ -219,8 +219,7 @@ async function scrapeAutoTrader(baseURL, options = {}) {
   } catch (error) {
     throw error;
   } finally {
-    if (browser) await browser.close();
-    if (chrome) await chrome.kill();
+    await browser.close();
   }
 }
 
@@ -264,6 +263,6 @@ app.get("/health", (req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });

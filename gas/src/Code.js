@@ -90,14 +90,25 @@ function fetchListings(baseURL) {
 
     console.log("Making API request to:", `${API_URL}/debug-scrape`);
     const response = UrlFetchApp.fetch(`${API_URL}/debug-scrape`, options);
-    console.log("Response status:", response.getResponseCode());
+    const responseCode = response.getResponseCode();
+    console.log("Response status:", responseCode);
     const responseText = response.getContentText();
     console.log("Response body:", responseText);
+
+    // Log headers for debugging
+    const headers = response.getAllHeaders();
+    console.log("Response headers:", JSON.stringify(headers, null, 2));
 
     const json = JSON.parse(responseText);
 
     if (!json.success) {
       console.error("API Error:", json.error);
+      if (json.stack) {
+        console.error("Error stack from API:", json.stack);
+      }
+      SpreadsheetApp.getUi().alert(
+        `API Error: ${json.error}\n\nPlease check if the Render environment variables are set correctly.`
+      );
       return null;
     }
 
@@ -106,6 +117,9 @@ function fetchListings(baseURL) {
   } catch (error) {
     console.error("Fetch Error:", error);
     console.error("Error stack:", error.stack);
+    SpreadsheetApp.getUi().alert(
+      `Error: ${error.message}\n\nPlease check the execution logs for more details.`
+    );
     return null;
   }
 }
