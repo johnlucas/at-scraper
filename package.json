@@ -4,6 +4,7 @@
   "main": "scraper.js",
   "scripts": {
     "start": "node scraper.js",
+    "build": "apt-get update && apt-get install -y chromium && npm install",
     "dev": "nodemon scraper.js"
   },
   "keywords": [
