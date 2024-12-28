@@ -32,20 +32,42 @@ async function setupBrowser() {
   // Add Render-specific configuration
   if (isRender) {
     console.log("Running on Render, configuring Chrome path");
-    const chromePath = process.env.CHROME_PATH || "/usr/bin/google-chrome";
-    launchOptions.executablePath = chromePath;
+    // Try multiple possible Chrome paths
+    const chromePaths = [
+      process.env.CHROME_PATH,
+      "/usr/bin/google-chrome-stable",
+      "/usr/bin/google-chrome",
+      "/usr/bin/chromium-browser",
+    ].filter(Boolean); // Remove undefined/null values
 
-    // Check if Chrome exists
+    console.log("Checking Chrome paths:", chromePaths);
+
+    // Check each path and use the first one that exists
+    const { existsSync } = require("fs");
+    const validPath = chromePaths.find((path) => existsSync(path));
+
+    if (!validPath) {
+      throw new Error(
+        `Chrome not found. Checked paths: ${chromePaths.join(", ")}`
+      );
+    }
+
+    console.log(`Found Chrome at: ${validPath}`);
+    launchOptions.executablePath = validPath;
+
+    // Check if Chrome is executable
     const { execSync } = require("child_process");
     try {
       console.log("Checking Chrome installation...");
-      const chromeVersion = execSync(`${chromePath} --version`).toString();
+      const chromeVersion = execSync(`${validPath} --version`).toString();
       console.log("Chrome version:", chromeVersion);
     } catch (error) {
       console.error("Error checking Chrome:", error.message);
       console.log("Listing available Chrome installations:");
       try {
-        const locations = execSync("ls -l /usr/bin/google-chrome*").toString();
+        const locations = execSync(
+          "ls -l /usr/bin/google-chrome* /usr/bin/chromium*"
+        ).toString();
         console.log(locations);
       } catch (err) {
         console.error("Error listing Chrome locations:", err.message);
