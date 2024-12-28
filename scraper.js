@@ -32,12 +32,13 @@ async function setupBrowser() {
   // Add Render-specific configuration
   if (isRender) {
     console.log("Running on Render, configuring Chrome path");
-    // Try multiple possible Chrome paths
+    // Try multiple possible Chrome/Chromium paths
     const chromePaths = [
       process.env.CHROME_PATH,
+      "/usr/bin/chromium",
+      "/usr/bin/chromium-browser",
       "/usr/bin/google-chrome-stable",
       "/usr/bin/google-chrome",
-      "/usr/bin/chromium-browser",
     ].filter(Boolean); // Remove undefined/null values
 
     console.log("Checking Chrome paths:", chromePaths);
@@ -47,31 +48,37 @@ async function setupBrowser() {
     const validPath = chromePaths.find((path) => existsSync(path));
 
     if (!validPath) {
-      throw new Error(
-        `Chrome not found. Checked paths: ${chromePaths.join(", ")}`
-      );
-    }
-
-    console.log(`Found Chrome at: ${validPath}`);
-    launchOptions.executablePath = validPath;
-
-    // Check if Chrome is executable
-    const { execSync } = require("child_process");
-    try {
-      console.log("Checking Chrome installation...");
-      const chromeVersion = execSync(`${validPath} --version`).toString();
-      console.log("Chrome version:", chromeVersion);
-    } catch (error) {
-      console.error("Error checking Chrome:", error.message);
-      console.log("Listing available Chrome installations:");
+      // List all executables in /usr/bin containing 'chrome' or 'chromium'
+      const { execSync } = require("child_process");
       try {
+        console.log("Listing available Chrome/Chromium installations:");
         const locations = execSync(
-          "ls -l /usr/bin/google-chrome* /usr/bin/chromium*"
+          "find /usr/bin -type f -executable -name " *
+            chrome *
+            " -o -name " *
+            chromium *
+            " "
         ).toString();
         console.log(locations);
       } catch (err) {
         console.error("Error listing Chrome locations:", err.message);
       }
+      throw new Error(
+        `Chrome/Chromium not found. Checked paths: ${chromePaths.join(", ")}`
+      );
+    }
+
+    console.log(`Found browser at: ${validPath}`);
+    launchOptions.executablePath = validPath;
+
+    // Check if browser is executable
+    const { execSync } = require("child_process");
+    try {
+      console.log("Checking browser installation...");
+      const version = execSync(`${validPath} --version`).toString();
+      console.log("Browser version:", version);
+    } catch (error) {
+      console.error("Error checking browser:", error.message);
     }
   }
 
