@@ -26,52 +26,40 @@ async function setupBrowser() {
       "--disable-accelerated-2d-canvas",
       "--disable-gpu",
       "--window-size=1920x1080",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process",
+      "--disable-site-isolation-trials",
+      "--disable-blink-features=AutomationControlled",
+      "--ignore-certificate-errors",
     ],
   };
 
   // Add Render-specific configuration
   if (isRender) {
     console.log("Running on Render, configuring Chrome path");
-    // Try multiple possible Chrome/Chromium paths
+    // Try multiple possible Chrome paths
     const chromePaths = [
       process.env.CHROME_PATH,
+      "/usr/bin/google-chrome-stable",
       "/usr/bin/chromium",
       "/usr/bin/chromium-browser",
-      "/usr/bin/google-chrome-stable",
       "/usr/bin/google-chrome",
-    ].filter(Boolean); // Remove undefined/null values
+    ].filter(Boolean);
 
     console.log("Checking Chrome paths:", chromePaths);
 
-    // Check each path and use the first one that exists
     const { existsSync } = require("fs");
     const validPath = chromePaths.find((path) => existsSync(path));
 
     if (!validPath) {
-      // List all executables in /usr/bin containing 'chrome' or 'chromium'
-      const { execSync } = require("child_process");
-      try {
-        console.log("Listing available Chrome/Chromium installations:");
-        const locations = execSync(
-          "find /usr/bin -type f -executable -name " *
-            chrome *
-            " -o -name " *
-            chromium *
-            " "
-        ).toString();
-        console.log(locations);
-      } catch (err) {
-        console.error("Error listing Chrome locations:", err.message);
-      }
       throw new Error(
-        `Chrome/Chromium not found. Checked paths: ${chromePaths.join(", ")}`
+        `Chrome not found. Checked paths: ${chromePaths.join(", ")}`
       );
     }
 
     console.log(`Found browser at: ${validPath}`);
     launchOptions.executablePath = validPath;
 
-    // Check if browser is executable
     const { execSync } = require("child_process");
     try {
       console.log("Checking browser installation...");
@@ -91,14 +79,30 @@ async function setupBrowser() {
     const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    await page.setUserAgent(
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
+    // Randomize user agent
+    const userAgents = [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    ];
+    const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+    await page.setUserAgent(userAgent);
 
+    // Set extra headers
     await page.setExtraHTTPHeaders({
       "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
       Accept:
         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Cache-Control": "no-cache",
+      "Upgrade-Insecure-Requests": "1",
+    });
+
+    // Mask webdriver
+    await page.evaluateOnNewDocument(() => {
+      delete Object.getPrototypeOf(navigator).webdriver;
+      window.navigator.chrome = {
+        runtime: {},
+      };
     });
 
     return { browser, page };
@@ -114,21 +118,55 @@ async function setupBrowser() {
 
 // Page navigation helper
 async function navigateToPage(page, url, options = {}) {
-  const { waitForSelector = '[data-testid="advertCard"]', timeout = 10000 } =
+  const { waitForSelector = '[data-testid="advertCard"]', timeout = 60000 } =
     options;
 
-  await page.goto(url, { waitUntil: "networkidle2" });
+  try {
+    // Set a longer timeout for navigation
+    await page.setDefaultNavigationTimeout(timeout);
+    await page.setDefaultTimeout(timeout);
 
-  if (waitForSelector) {
-    try {
-      await page.waitForSelector(waitForSelector, { timeout });
-    } catch (error) {
-      console.log(`No elements found for selector: ${waitForSelector}`);
-      return false;
+    // Add random delay before navigation
+    const delay = Math.floor(Math.random() * 2000) + 1000; // 1-3 seconds
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    await page.goto(url, {
+      waitUntil: ["networkidle2", "domcontentloaded"],
+      timeout: timeout,
+    });
+
+    if (waitForSelector) {
+      try {
+        await page.waitForSelector(waitForSelector, { timeout });
+      } catch (error) {
+        console.log(`No elements found for selector: ${waitForSelector}`);
+        return false;
+      }
     }
-  }
 
-  return true;
+    // Add random delay after navigation
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.random() * 1000 + 500)
+    );
+
+    return true;
+  } catch (error) {
+    console.error("Navigation error:", error.message);
+    // Take a screenshot on navigation error
+    try {
+      await page.screenshot({
+        path: "/tmp/error-screenshot.png",
+        fullPage: true,
+      });
+      console.log("Error screenshot saved to /tmp/error-screenshot.png");
+    } catch (screenshotError) {
+      console.error(
+        "Failed to take error screenshot:",
+        screenshotError.message
+      );
+    }
+    return false;
+  }
 }
 
 // New helper function to get the total number of pages
